@@ -4361,8 +4361,11 @@ SYSCALL_DEFINE2(ptree,struct prinfo*, buf, int*, nr)
 		if (cp_cnt < total_cp_number) {
 			copy_task_to_buf(&kernel_buff, p); 
 			/* return if copy error*/
-			if (copy_to_user(buf + cp_cnt, &kernel_buff, sizeof(struct prinfo)) != 0) 
+			if (copy_to_user(buf + cp_cnt, &kernel_buff, sizeof(struct prinfo)) != 0) { 
+				/* unlock */
+				read_unlock(&tasklist_lock);
 				return -EFAULT;
+			}
 			++cp_cnt;
 		}
 		

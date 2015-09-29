@@ -8,7 +8,7 @@
 
 void debug_buf(struct prinfo *p)
 {
-	printf("%s,%d,%ld,%d,%d,%d,%d\n", p->comm, p->pid, p->state,
+	printf("%s,%d,%ld,%d,%d,%d,%ld\n", p->comm, p->pid, p->state,
 				p->parent_pid, p->first_child_pid, p->next_sibling_pid, p->uid);
 }
 
@@ -22,7 +22,7 @@ int main(int argc, char *argv[])
 	struct prinfo * buff = (struct prinfo *)malloc(n * sizeof(struct prinfo));
 	int i, j;
 	int level[10000];
-	int ret = syscall(223, buff, &n);
+	int ret = syscall(223, 123, &n);
 	for (i = 0; i < 10000; ++i)
 		level[i] = -1;
 	if (ret > 0) {

@@ -1,35 +1,21 @@
-# Set this to the name of your program
-TARGET = ptree_test
+CC := arm-none-linux-gnueabi-gcc
+LD := arm-none-linux-gnueabi-gcc
+CFLAGS := -g -Wall -Werror -static
+LDFLAGS := -static
 
-# Edit this variable to point to all
-# of your sources files (make sure
-# to put a complete relative path)
-SOURCES = test.c
+OBJECTS := test.o
 
-# -----------------------------------------------
-# 
-# Don't touch things below here unless
-# you know what you're doing :-)
-# 
-OBJECTS = $(SOURCES:%.c=%.c.o)
-INCLUDE =
-CFLAGS = -g -Wall --sysroot=$(SYSROOT)
-LDFLAGS = --sysroot=$(SYSROOT)
-CC = arm-linux-androideabi-gcc
-LD = arm-linux-androideabi-gcc
+all: ptree_test
 
-default: $(SOURCES) $(TARGET)
 
-$(TARGET): $(OBJECTS)
-	@echo [Arm-LD] $@
-	@$(LD) $(LDFLAGS) $(OBJECTS) -o $@
+ptree_test: $(OBJECTS)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJECTS)
 
-%.c.o: %.c
-	@echo [Arm-CC] $<...
-	@$(CC) -c $(CFLAGS) $< -o $@
+%.o: %.c
+	$(CC) $(CFLAGS) -c $^
 
-clean: .PHONY
-	@echo [CLEAN]
-	@rm -f $(OBJECTS) $(TARGET)
+clean:
+	rm -f test.o
+	rm -f ptree_test
 
-.PHONY:
+.PHONY: clean
