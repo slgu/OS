@@ -22,7 +22,7 @@ int main(int argc, char *argv[])
 	struct prinfo * buff = (struct prinfo *)malloc(n * sizeof(struct prinfo));
 	int i, j;
 	int level[10000];
-	int ret = syscall(223, 123, &n);
+	int ret = syscall(223, buff, &n);
 	for (i = 0; i < 10000; ++i)
 		level[i] = -1;
 	if (ret > 0) {

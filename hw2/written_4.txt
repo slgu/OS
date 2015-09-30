@@ -1,0 +1,3 @@
+a. the pid field of process ptree_test and childpid field of process sh changes, because everytime you start your test program, it is a new process, and pid allocation is in a increasing mode. (when previous process exited and task struct was cleanedup, the freeed pid will be allocated again).
+
+b. one process starts, called android.browser. The parent of it is zygote. And when we press the "Home" button, no processes was destroyed, because pressing "Home" button doesn't kill the processes, just put it in the background.

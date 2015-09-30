@@ -1,0 +1,7 @@
+kernel/sched/core.c:4341:2: error: unknown type name 'list_head'
+kernel/sched/core.c:4344:1: error: expected ';', identifier or '(' before 'long'
+kernel/sched/core.c: In function 'sys_ptree':
+kernel/sched/core.c:4361:2: warning: ISO C90 forbids mixed declarations and code [-Wdeclaration-after-statement]
+error, forbidden warning: core.c:4361
+make[2]: *** [kernel/sched/core.o] Error 1
+make[1]: *** [kernel/sched] Error 2

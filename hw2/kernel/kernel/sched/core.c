@@ -4335,15 +4335,27 @@ void copy_task_to_buf(struct prinfo *buf, struct task_struct *p)
 }
 
 /*TODO definition for ptree*/
+struct prinfo_list
+{
+	struct prinfo data;
+	struct list_head list;
+};
+
 SYSCALL_DEFINE2(ptree,struct prinfo*, buf, int*, nr)
 {
 	struct task_struct *p = &init_task;
-	struct prinfo kernel_buff;
 	int total_cp_number; 
-	int ret;
 	int total_cnt = 0;
 	int cp_cnt = 0;
+	struct prinfo_list prinfo_list_head;
 	
+	struct prinfo_list *nowidx;
+	struct prinfo_list *newnode;
+
+	struct list_head *pos, *tmppos;
+	int ret;
+	newnode = NULL;
+	nowidx = &prinfo_list_head;
 	/* return if copy error*/
 	ret = copy_from_user(&total_cp_number, nr, sizeof(int)); 
 	if (ret != 0)
@@ -4353,19 +4365,19 @@ SYSCALL_DEFINE2(ptree,struct prinfo*, buf, int*, nr)
 	if (buf == NULL || total_cp_number < 1)
 		return -EINVAL;
 
+	INIT_LIST_HEAD((&prinfo_list_head.list));
+
 	/* lock the process lists */
 	read_lock(&tasklist_lock);
 	while (1) {
 
 		/* copy this task */
 		if (cp_cnt < total_cp_number) {
-			copy_task_to_buf(&kernel_buff, p); 
-			/* return if copy error*/
-			if (copy_to_user(buf + cp_cnt, &kernel_buff, sizeof(struct prinfo)) != 0) { 
-				/* unlock */
-				read_unlock(&tasklist_lock);
-				return -EFAULT;
-			}
+			/* kmalloc kernel copy */ 
+			newnode = kmalloc(sizeof(struct prinfo_list), GFP_NOWAIT);
+			list_add(&newnode->list, &nowidx->list);
+			copy_task_to_buf(&newnode->data, p); 
+			nowidx = newnode;
 			++cp_cnt;
 		}
 		
@@ -4399,7 +4411,24 @@ SYSCALL_DEFINE2(ptree,struct prinfo*, buf, int*, nr)
 		}
 	}
 	read_unlock(&tasklist_lock);
-	return total_cnt;
+	cp_cnt = 0;
+	ret = total_cnt;
+	/* copy to user */
+	list_for_each(pos, &prinfo_list_head.list) {
+		nowidx = list_entry(pos, struct prinfo_list, list);
+		if (copy_to_user(buf + cp_cnt, &nowidx->data, sizeof(struct prinfo)) != 0) { 
+			ret = -EFAULT;
+			break;
+		}
+		++cp_cnt;
+	}
+	/* free */
+	list_for_each_safe(pos, tmppos, &prinfo_list_head.list) {
+		nowidx = list_entry(pos, struct prinfo_list, list);
+		kfree(nowidx);
+	}
+	/* return */
+	return ret;
 }
 /**
  * sys_sched_setparam - set/change the RT priority of a thread
