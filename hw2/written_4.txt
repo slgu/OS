@@ -1,3 +1,12 @@
-a. the pid field of process ptree_test and childpid field of process sh changes, because everytime you start your test program, it is a new process, and pid allocation is in a increasing mode. (when previous process exited and task struct was cleanedup, the freeed pid will be allocated again).
+a. 
+First, the pid field of process ptree_test and childpid field of process sh changes, because everytime you start your test program, it is a new process, and pid allocation is in a increasing mode. (when previous process exited and task struct was cleanedup, the freeed pid will be allocated again).
 
-b. one process starts, called android.browser. The parent of it is zygote. And when we press the "Home" button, no processes was destroyed, because pressing "Home" button doesn't kill the processes, just put it in the background.
+b.
+One process starts, called android.browser. The parent of it is zygote. And when we press the "Home" button, no processes was destroyed, because pressing "Home" button doesn't kill the processes, just put it in the background.
+
+c.
+1.The purpose of this process is to generate android application processes, such as android.browser, m.android.music, and generate some service processes, such as system_server. 
+2.Zygote can not be found in the directory, because its initial name is app_process, which can be found in /system/bin/app_process, and when app_process starts, it sets its process name to be zygote given correponding input parameter "--zygote", and use appruntime to init this process, so we can see "zygote" from the process tree. 
+3.Because there are some limited recource, android uses such a process zygote to manage application. When a zygote is created, it includes a VM, and each application
+created is bound to this VM, which means the VM is like a container and manage the resources between applications to make the best use of resources because of the limitation
+of the resources.
