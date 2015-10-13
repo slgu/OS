@@ -97,6 +97,12 @@ SYSCALL_DEFINE1(light_evt_create, struct event_requirements __user *, intensity_
 	}
 	
 	ptr->eid = allocate_eid();
+	/* allocate eid error */
+	if (ptr->eid == -1) {
+		kfree(ptr);
+		return -14;
+	}
+
 	/* lock the light event list and add ptr*/
 	mutex_lock(&light_event_list_lock);
 	/* TODO insert */
@@ -114,8 +120,28 @@ SYSCALL_DEFINE1(light_evt_create, struct event_requirements __user *, intensity_
  */
 SYSCALL_DEFINE1(light_evt_wait, int, event_id)
 {
+	struct list_head  * pos;
+	struct light_event * cur_event = NULL;
+	DECLARE_WAITQUEUE(wait, current);
+	mutex_lock(&light_event_list_lock);
+	list_for_each(pos, &event_list) {
+		cur_event =  list_entry(pos, struct light_event, list);	
+		if (cur_event->eid == event_id) 
+			break;
+	}
+	if (cur_event == NULL) {
+		mutex_unlock(&light_event_list_lock);	
+		return -15;
+	}
+	/* declare self wait queue */
+	mutex_lock(&cur_event->lock);
+	/* add self to wait queue */
+	add_wait_queue(&cur_event->queue, &wait);
+	mutex_unlock(&cur_event->lock);
+	mutex_unlock(&light_event_list_lock);
 	return 0;
 }
+
 /*
  * The light_evt_signal system call.
  *
@@ -128,8 +154,45 @@ SYSCALL_DEFINE1(light_evt_wait, int, event_id)
  *
  * system call number 382
  */
+
+int judge_light_intensity(struct event_requirements * er)
+{
+	int i;
+	int above = 0;
+	for (i = start; i != end; i = (i + 1) % WINDOW) {
+		if (kernel_light_intensity_arr[i].cur_intensity >= er->req_intensity - NOISE)
+			++above;
+	}
+	if (above > er->frequency)
+		return 1;
+	else
+		return 0;
+}
 SYSCALL_DEFINE1(light_evt_signal, struct light_intensity __user *, user_light_intensity)
 {
+	struct list_head  * pos;
+	struct light_event * cur_event = NULL;
+	int ret;
+	if(copy_from_user(&kernel_light_intensity, user_light_intensity, sizeof(struct light_intensity)) == -1) {
+		return -ENOMEM;
+	}
+	/* add to kernel */
+	add_light_intensity(&kernel_light_intensity);
+
+	mutex_lock(&light_event_list_lock);
+	/* check event */
+
+	list_for_each(pos, &event_list) {
+		cur_event = list_entry(pos, struct light_event, list);	
+		ret = judge_light_intensity(&cur_event->er);
+		if (ret != 0) {
+			/* wake up */
+			mutex_lock(&cur_event->lock);
+			wake_up_interruptible(&cur_event->queue);
+			mutex_unlock(&cur_event->lock);
+		}
+	}
+	mutex_unlock(&light_event_list_lock);
 	return 0;
 }
 /*
