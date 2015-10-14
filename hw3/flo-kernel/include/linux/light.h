@@ -31,6 +31,8 @@ struct light_event {
 	struct list_head list; /* list of event */
 	int eid; /* event id */
 	struct event_requirements er; /*event requirements */
-	struct mutex lock; /* wait_queue lock */
-};
+	int flg; /* used for wait event */
+	int refer_count; /* refer count used for destroy */
+	int destroy_flg; /* flag for destroy */
+}; 
 #endif
