@@ -11,6 +11,7 @@
 #include <linux/rwlock.h>
 #include <linux/list.h>
 #include <linux/slab.h>
+#include <asm/atomic.h>
 /* TODO */
 
 /* kernel data */
@@ -90,20 +91,18 @@ SYSCALL_DEFINE1(light_evt_create, struct event_requirements __user *, intensity_
 	mutex_init(&ptr->lock);
 	/* init waiting queue */
 	init_waitqueue_head(&ptr->queue);
-	
 	if (copy_from_user(&ptr->er, intensity_params, sizeof(struct event_requirements)) != 0) {
 		kfree(ptr);
 		return -ENOMEM;
 	}
-	ptr->flg = 0;	
+	ptr->flg = 0;
 	ptr->eid = allocate_eid();
+	ptr->ref_count = ATOMIC_INIT(0);
 	/* allocate eid error */
 	if (ptr->eid == -1) {
 		kfree(ptr);
 		return -14;
 	}
-	ptr->refer_count = 0;
-	ptr->destroy_flg = 0;
 	/* lock the light event list and add ptr*/
 	mutex_lock(&light_event_list_lock);
 	/* TODO insert */
@@ -123,6 +122,7 @@ SYSCALL_DEFINE1(light_evt_wait, int, event_id)
 {
 	struct list_head  * pos;
 	struct light_event * cur_event = NULL;
+	int ret = 0;
 	DECLARE_WAITQUEUE(wait, current);
 	mutex_lock(&light_event_list_lock);
 	list_for_each(pos, &event_list) {
@@ -138,18 +138,20 @@ SYSCALL_DEFINE1(light_evt_wait, int, event_id)
 	mutex_lock(&cur_event->lock);
 	/* add self to wait queue */
 	add_wait_queue(&cur_event->queue, &wait);
-	++cur_event->refer_count;
 	mutex_unlock(&cur_event->lock);
+	atomic_inc(&cur_event->ref_count);/* add reference count */
 	mutex_unlock(&light_event_list_lock);
 	/* wait */
-	wait_event(cur_event->queue, cur_event->flg != 0);
+	wait_event_interruptible(cur_event->queue, cur_event->flg != EVT_NOTHING);
+	ret = (cur_event->flg != EVT_REQUIREMENT_SATISFIED);
 	remove_wait_queue(&cur_event->queue, &wait); /* delete from wait queue */
-	--cur_event->refer_count;
-	if (cur_event->destroy_flg == 1 && cur_event->refer_count == 0) {
-		/*refer zero and destroy_flg 1 we delete the event */
-		kfree(cur_event);
+	if (atomic_dec_and_test(&cur_event->ref_count)) {
+		if (ret == 1) {
+			/* need delete */
+			kfree(cur_event);
+		}
 	}
-	return 0;
+	return ret;
 }
 
 /*
@@ -194,19 +196,18 @@ SYSCALL_DEFINE1(light_evt_signal, struct light_intensity __user *, user_light_in
 	/* check event */
 
 	list_for_each(pos, &event_list) {
-		cur_event = list_entry(pos, struct light_event, list);	
+		cur_event = list_entry(pos, struct light_event, list);
 		ret = judge_light_intensity(&cur_event->er);
 		if (ret != 0) {
 			/* wake up */
-			mutex_lock(&cur_event->lock);
-			cur_event->flg = 1;
-			wake_up(&cur_event->queue);
-			mutex_unlock(&cur_event->lock);
+			cur_event->flg = EVT_REQUIREMENT_SATISFIED;
+			wake_up_interruptible(&cur_event->queue);
 		}
 	}
 	mutex_unlock(&light_event_list_lock);
 	return 0;
 }
+
 /*
  * Destroy an event using the event_id.
  *
@@ -229,13 +230,13 @@ SYSCALL_DEFINE1(light_evt_destroy, int, event_id)
 		return -14;
 	/* delete from list */
 	list_del(pos);
-	if (cur_event->refer_count == 0) {
-		/* no reference */
+	if (atomic_read($cur_event->ref_count) == 0) {
 		kfree(cur_event);
+		return 0;
 	}
 	else {
-		/* set destroy flag */
-		cur_event->destroy_flg = 1;
+		cur_event->flg = EVT_NEED_KFREE; /* set free flag */
+		wake_up_interruptible(&cur_event->queue);
 	}
 	mutex_unlock(&light_event_list_lock);
 	return 0;

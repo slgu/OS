@@ -10,12 +10,17 @@
 #include <linux/wait.h>
 #include <linux/list.h>
 #include <linux/mutex.h>
+#include <asm/atomic.h>
 /* TODO */
 struct light_intensity {
 	int cur_intensity; /* scaled intensity as read from the light sensor */
 }; 
 #define NOISE 10
 #define WINDOW 20
+
+#define EVT_REQUIREMENT_SATISFIED 1
+#define EVT_NEED_KFREE 2
+#define EVT_NOTHING 0
 /*
  * Defines a light event.
  *
@@ -32,7 +37,7 @@ struct light_event {
 	int eid; /* event id */
 	struct event_requirements er; /*event requirements */
 	int flg; /* used for wait event */
-	int refer_count; /* refer count used for destroy */
-	int destroy_flg; /* flag for destroy */
+	struct mutex lock; /* used for wait_queue_head add remove */
+	atomic_t ref_count;
 }; 
 #endif
