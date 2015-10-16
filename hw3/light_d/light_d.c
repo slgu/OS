@@ -44,6 +44,7 @@ static void enumerate_sensors(const struct sensors_module_t *sensors);
 static int poll_sensor_data_emulator(void);
 static int poll_sensor_data(struct sensors_poll_device_t *sensors_device);
 
+#define TIME_INTERVAL 10
 /* entry point: fill in daemon implementation
    where indicated */
 
@@ -52,7 +53,6 @@ void daemon_mode()
 
 /* Fill in daemon implementation here */
 	pid_t pid;
-	int i;
 	pid = fork();
 	if (pid < 0)
 		exit(EXIT_FAILURE);
@@ -62,8 +62,6 @@ void daemon_mode()
 		exit(EXIT_FAILURE);
 	chdir("/");
 	umask(0);
-	for (i = 0; i < MAXFILE; i++)
-		close(i);
 }
 
 int main(int argc, char **argv)
@@ -101,6 +99,8 @@ int main(int argc, char **argv)
 	/* Fill in daemon implementation around here */
 	printf("turn me into a daemon!\n");
 	while (1) {
+		/* sleep */
+		usleep(1000 * TIME_INTERVAL);
 		poll_sensor_data(sensors_device);
 		
 	}
@@ -125,15 +125,19 @@ static int poll_sensor_data(struct sensors_poll_device_t *sensors_device)
     int i; 
       
 	if (cur_device == DEVICE) {
-		
 		for (i = 0; i < count; ++i) {
                 	if (buffer[i].sensor != effective_sensor)
                         	continue;
                 
 		/* You have the intensity here - scale it and send it to your kernel */
-                
 		cur_intensity = buffer[i].light;
-		printf("%f\n", cur_intensity);	
+		struct light_intensity user_light;
+		user_light.cur_intensity = (int)(cur_intensity * 100);
+		syscall(378, &user_light);
+		user_light.cur_intensity = 0;
+		syscall(379, &user_light);
+		printf("%d\n", user_light.cur_intensity);
+		syscall(382, &user_light); /* signal event */	
 		}
 	}
 
@@ -144,7 +148,13 @@ static int poll_sensor_data(struct sensors_poll_device_t *sensors_device)
 		/* cur_intensity has a floating point value that you would have fed to */
 		/* light_sensor binary */
 		cur_intensity = poll_sensor_data_emulator();
-		printf("%f\n", cur_intensity);
+		struct light_intensity user_light;
+		user_light.cur_intensity = (int)(cur_intensity * 100);
+		syscall(378, &user_light);
+		user_light.cur_intensity = 0;
+		syscall(379, &user_light);
+		printf("%d\n", user_light.cur_intensity);
+		syscall(382, &user_light); /* signal event */	
 	}
 	
 	return 0;

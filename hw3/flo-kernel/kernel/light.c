@@ -63,8 +63,6 @@ SYSCALL_DEFINE1(set_light_intensity, struct light_intensity __user *, user_light
 	ret = copy_from_user(&kernel_light_intensity, user_light_intensity, sizeof(struct light_intensity));
 	if (ret != 0)
 		return ret;
-	/* add to kernel buffer */
-	add_light_intensity(&kernel_light_intensity);
 	return 0;
 }
 
@@ -81,9 +79,11 @@ SYSCALL_DEFINE1(get_light_intensity, struct light_intensity __user *, user_light
  *
  * system call number 380
  */
+
 SYSCALL_DEFINE1(light_evt_create, struct event_requirements __user *, intensity_params)
 {
 	struct light_event * ptr = kmalloc(sizeof(struct light_event), GFP_KERNEL);
+	int ret;
 	if (!ptr) {
 		return -ENOMEM;
 	}
@@ -95,9 +95,10 @@ SYSCALL_DEFINE1(light_evt_create, struct event_requirements __user *, intensity_
 		kfree(ptr);
 		return -ENOMEM;
 	}
-	ptr->flg = 0;
+	ptr->flg = EVT_NOTHING;
 	ptr->eid = allocate_eid();
-	ptr->ref_count = ATOMIC_INIT(0);
+	ret = ptr->eid;
+	atomic_set(&ptr->ref_count, 0);
 	/* allocate eid error */
 	if (ptr->eid == -1) {
 		kfree(ptr);
@@ -108,7 +109,7 @@ SYSCALL_DEFINE1(light_evt_create, struct event_requirements __user *, intensity_
 	/* TODO insert */
 	list_add_tail(&ptr->list, &event_list); 
 	mutex_unlock(&light_event_list_lock);
-	return 0;
+	return ret;
 }
 /*
  * Block a process on an event.
@@ -124,6 +125,7 @@ SYSCALL_DEFINE1(light_evt_wait, int, event_id)
 	struct light_event * cur_event = NULL;
 	int ret = 0;
 	DECLARE_WAITQUEUE(wait, current);
+	printk("wait function call: %d\n", event_id);
 	mutex_lock(&light_event_list_lock);
 	list_for_each(pos, &event_list) {
 		cur_event =  list_entry(pos, struct light_event, list);	
@@ -142,11 +144,15 @@ SYSCALL_DEFINE1(light_evt_wait, int, event_id)
 	atomic_inc(&cur_event->ref_count);/* add reference count */
 	mutex_unlock(&light_event_list_lock);
 	/* wait */
+	printk("begin wait\n");
 	wait_event_interruptible(cur_event->queue, cur_event->flg != EVT_NOTHING);
+	printk("end wait\n");
 	ret = (cur_event->flg != EVT_REQUIREMENT_SATISFIED);
 	remove_wait_queue(&cur_event->queue, &wait); /* delete from wait queue */
 	if (atomic_dec_and_test(&cur_event->ref_count)) {
 		if (ret == 1) {
+			/* free eid */
+			free_eid(cur_event->eid);
 			/* need delete */
 			kfree(cur_event);
 		}
@@ -171,8 +177,8 @@ int judge_light_intensity(struct event_requirements * er)
 {
 	int i;
 	int above = 0;
-	for (i = start; i != end; i = (i + 1) % WINDOW) {
-		if (kernel_light_intensity_arr[i].cur_intensity >= er->req_intensity - NOISE)
+	for (i = 0; i < total; ++i) {
+		if (kernel_light_intensity_arr[(i + start) % WINDOW].cur_intensity >= er->req_intensity - NOISE)
 			++above;
 	}
 	if (above > er->frequency)
@@ -186,6 +192,7 @@ SYSCALL_DEFINE1(light_evt_signal, struct light_intensity __user *, user_light_in
 	struct list_head  * pos;
 	struct light_event * cur_event = NULL;
 	int ret;
+	printk("begin wake up function\n");
 	if(copy_from_user(&kernel_light_intensity, user_light_intensity, sizeof(struct light_intensity)) == -1) {
 		return -ENOMEM;
 	}
@@ -200,6 +207,7 @@ SYSCALL_DEFINE1(light_evt_signal, struct light_intensity __user *, user_light_in
 		ret = judge_light_intensity(&cur_event->er);
 		if (ret != 0) {
 			/* wake up */
+			printk("wake up event %d\n", cur_event->eid);
 			cur_event->flg = EVT_REQUIREMENT_SATISFIED;
 			wake_up_interruptible(&cur_event->queue);
 		}
@@ -219,6 +227,7 @@ SYSCALL_DEFINE1(light_evt_destroy, int, event_id)
 {
 	struct list_head  * pos;
 	struct light_event * cur_event = NULL;
+	printk("begin destroy\n");
 	mutex_lock(&light_event_list_lock);
 	list_for_each(pos, &event_list) {
 		cur_event = list_entry(pos, struct light_event, list);	
@@ -226,12 +235,18 @@ SYSCALL_DEFINE1(light_evt_destroy, int, event_id)
 			break;
 		}
 	}
-	if (cur_event == NULL)
+	if (cur_event == NULL) {
+		mutex_unlock(&light_event_list_lock);
 		return -14;
+	}
+	printk("eid: %d refer count: %d\n", cur_event->eid, atomic_read(&cur_event->ref_count));
 	/* delete from list */
 	list_del(pos);
-	if (atomic_read($cur_event->ref_count) == 0) {
+	if (atomic_read(&cur_event->ref_count) == 0) {
+		/* free eid */
+		free_eid(cur_event->eid);
 		kfree(cur_event);
+		mutex_unlock(&light_event_list_lock);
 		return 0;
 	}
 	else {
