@@ -278,6 +278,13 @@ static inline int rt_bandwidth_enabled(void)
 	return sysctl_sched_rt_runtime >= 0;
 }
 
+/* MODIFY WRR class' related field in a runqueu: */
+struct wrr_rq{
+	struct rq *rq;
+	/* link all wrr policy tasks */
+	unsigned long wrr_nr_running;
+	struct list_head wrr_entity_list;
+};
 /* Real-Time classes' related field in a runqueue: */
 struct rt_rq {
 	struct rt_prio_array active;
@@ -372,7 +379,7 @@ struct rq {
 
 	struct cfs_rq cfs;
 	struct rt_rq rt;
-
+	struct wrr_rq wrr;
 #ifdef CONFIG_FAIR_GROUP_SCHED
 	/* list of leaf cfs_rq on this cpu: */
 	struct list_head leaf_cfs_rq_list;
@@ -857,6 +864,7 @@ extern const struct sched_class stop_sched_class;
 extern const struct sched_class rt_sched_class;
 extern const struct sched_class fair_sched_class;
 extern const struct sched_class idle_sched_class;
+extern const struct sched_class wrr_sched_class;
 
 
 #ifdef CONFIG_SMP

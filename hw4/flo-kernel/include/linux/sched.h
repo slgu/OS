@@ -1231,7 +1231,12 @@ struct sched_entity {
 	struct cfs_rq		*my_q;
 #endif
 };
-
+/* MODIFY */
+struct sched_wrr_entity {
+	unsigned int time_slice;
+	unsigned long timeout;
+	struct list_head run_list;
+}
 struct sched_rt_entity {
 	struct list_head run_list;
 	unsigned long timeout;
@@ -1281,6 +1286,7 @@ struct task_struct {
 	const struct sched_class *sched_class;
 	struct sched_entity se;
 	struct sched_rt_entity rt;
+	struct sched_wrr_entity wrr;
 
 #ifdef CONFIG_PREEMPT_NOTIFIERS
 	/* list of struct preempt_notifier: */
