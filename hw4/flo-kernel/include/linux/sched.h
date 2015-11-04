@@ -1237,6 +1237,7 @@ struct sched_wrr_entity {
 	unsigned long timeout;
 	struct list_head run_list;
 }
+
 struct sched_rt_entity {
 	struct list_head run_list;
 	unsigned long timeout;

@@ -282,7 +282,7 @@ static inline int rt_bandwidth_enabled(void)
 struct wrr_rq{
 	struct rq *rq;
 	/* link all wrr policy tasks */
-	unsigned long wrr_nr_running;
+	unsigned long nr_running;
 	struct list_head wrr_entity_list;
 };
 /* Real-Time classes' related field in a runqueue: */
@@ -379,7 +379,9 @@ struct rq {
 
 	struct cfs_rq cfs;
 	struct rt_rq rt;
+	/* MODIFY */
 	struct wrr_rq wrr;
+	unsigned long nr_running;
 #ifdef CONFIG_FAIR_GROUP_SCHED
 	/* list of leaf cfs_rq on this cpu: */
 	struct list_head leaf_cfs_rq_list;

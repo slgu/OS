@@ -1,14 +1,36 @@
 #include "sched.h"
 
+#define FOREGROUND_TYPE 0
+#define BACKGROUND_TYPE 1
+#define FOREGROUND_WEIGHT 10
+#define BACKGROUND_WEIGHT 1
+static int get_task_group(struct task_struct * p)
+{
+	char group_path[30];
+	cgroup_path(task_group(p)->css.cgroup, group_path, 30);
+	if (strcmp(group_path, "/") == 0)
+		return FOREGROUND_TYPE;
+	else
+		return BACKGROUND_TYPE;
+}
 
 static void
 enqueue_task_wrr(struct rq *rq, struct task_struct *p, int flags)
 {
 	/* add new task the tail */
 	struct sched_wrr_entity * wrr_se = &p.wrr;
+	int task_type = get_task_group(p);
 	if (flags & ENQUEUE_WAKEUP)
 		wrr_se->timeout = 0;
 	__enqueue_entity_wrr(wrr_se, rq, 0);
+	
+	/* add weight to statistics */
+	if (task_type == FOREGROUND_TYPE)
+		rq->nr_running = rq->nr_running + FOREGROUND_WEIGHT;
+	else
+		rq->nr_running = rq->nr_running + BACKGROUND_WEIGHT;
+		
+	/* increase load */
 }
 
 static void 
@@ -16,22 +38,28 @@ __enqueue_entity_wrr(struct sched_wrr_entity *wrr_se, struct rq *rq, int head)
 {
 	/* add entity to queue */
 	if (head)
-		list_add(&wrr_se.run_list, &rq->wrr_rq.wrr_entity_list);
+		list_add(&wrr_se.run_list, &rq->wrr.wrr_entity_list);
 	else
-		list_add_tail(&wrr_se.run_list, &rq->wrr_rq.wrr_entity_list);
+		list_add_tail(&wrr_se.run_list, &rq->wrr.wrr_entity_list);
 
 }
+
 static void
 dequeue_task_wrr(struct rq *rq, struct task_struct *p, int flags)
 {
 	/* delete a item from the wrr_rq */
 	__dequeue_entity_wrr(&p->wrr, rq);
+	int task_type = get_task_group(p);
+	if (task_type == FOREGROUND_TYPE)
+		rq->nr_running = rq->nr_running - FOREGROUND_WEIGHT;
+	else
+		rq->nr_running = rq->nr_running - BACKGROUND_WEIGHT;
 }
 
 static void
 __dequeue_entity_wrr(struct sched_wrr_entity *wrr_se, struct rq *rq)
 {
-	list_del(&wrr_se.run_list, &rq->wrr_rq.wrr_entity_list);
+	list_del(&wrr_se.run_list, &rq->wrr.wrr_entity_list);
 }
 
 
@@ -42,17 +70,25 @@ static void put_prev_task_wrr(struct rq *rq, struct task_struct *prev)
 	enqueue_task_wrr(rq, prev, 0); 
 }
 
+static void watchdog(struct rq *rq, struct task_struct *p)
+{
+
+}
 static void task_tick_wrr(struct rq *rq, struct task_struct *p, int queued)
 {
 	struct sched_wrr_entity * wrr_se = &p->wrr;
+	update_curr_wrr(rq);
+	int task_type = get_task_group(p);
 	if (p->policy != SCHED_WRR)
 		return;
 	if (--p->wrr.time_slice)
 		return;
-	/* need to change */
-	p->wrr.time_slice = 100;
+	if (task_type == FOREGROUND_TYPE)
+		p->wrr.time_slice = 100 * FOREGROUND_WEIGHT;
+	else
+		p->wrr.time_slice = 100 * BACKGROUND_WEIGHT;
 	/* move to the tail */
-	list_move_tail(&p->pushable_wrr_tasks, &rq->wrr.pushable_tasks_list);
+	list_move_tail(&p->wrr_se.run_list, &rq->wrr.wrr_entity_list);
 	/* reschedule */
 	resched_curr(rq);
 }
@@ -102,19 +138,54 @@ pick_next_task_wrr(struct rq *rq, struct task_struct *prev)
 {
 	/* set prev task to end of sche class queue */
 	put_prev_task(rq, prev);
-	if (list_empty(&rq->wrr_rq.pushable_tasks_list)) {
+	if (list_empty(&rq->wrr.wrr_entity_list)) {
 		return NULL;
 	}
-	struct list_head * real_head = &rq->wrr_rq.pushable_tasks_list.next
-	struct task_struct * p = list_entry(real_head, struct task_struct *, pushable_wrr_tasks);
+	struct sched_wrr_entity * entity = list_first_entry(&rq->wrr.wrr_entity_list, struct sched_wrr_entity *, run_list); 
+	struct task_struct * p = list_entry(entity, struct task_struct *, wrr_se);
 	p->se.exec_start = rq_clock_task(rq);
+	/* remove from wrr queue */
+	dequeue_task_wrr(rq, p, 0);
 	return p;
 }
-static int
-select_task_rq_rt(struct task_struct *p, int cpu, int sd_flag, int flags)
-{
 
+static int find_lowest_cpu(void)
+{
+	struct rq * rq;
+	int start_cpu = 0;	
+	int target = -1;
+	int lowest = -1;
+	/* traverse cpu */
+	int number_cpus = num_online_cpus();
+	for (; start_cpu < number_cpus; ++start_cpu) {
+		rq = cpu_rq(start_cpu);
+		if (lowest == -1 || lowest > rq->nr_running) {
+			lowest = rq->nr_running;
+			target = start_cpu;
+		}
+	}
+	return target;
 }
+
+static int
+select_task_rq_wrr(struct task_struct *p, int cpu, int sd_flag, int flags)
+{
+	struct task_struct *curr;
+	struct rq *rq;
+	int target;
+	/* For anything but wake ups, just return the task_cpu */
+	if (sd_flag != SD_BALANCE_WAKE && sd_flag != SD_BALANCE_FORK)
+		return cpu;
+	/* lock needed */
+	rcu_read_lock();
+	int target = find_lowest_cpu();	
+	rcu_read_unlock();
+	if (target == -1)
+		return cpu;
+	else
+		return target;
+}
+
 const struct sched_class wrr_sched_class = {
 	.next			= &idle_sched_class, 
 	.enqueue_task		= enqueue_task_wrr,
