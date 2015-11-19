@@ -1,0 +1,1 @@
+cmd_drivers/misc/slimport_anx7808/built-in.o :=  arm-eabi-ld -EL    -r -o drivers/misc/slimport_anx7808/built-in.o drivers/misc/slimport_anx7808/slimport.o drivers/misc/slimport_anx7808/slimport_tx_drv.o 

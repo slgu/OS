@@ -1,0 +1,1 @@
+cmd_sound/soc/msm/snd-soc-msm8960.o := arm-eabi-ld -EL    -r -o sound/soc/msm/snd-soc-msm8960.o sound/soc/msm/msm8960.o sound/soc/msm/apq8064.o sound/soc/msm/msm8930.o sound/soc/msm/mpq8064.o sound/soc/msm/apq8064-i2s.o 

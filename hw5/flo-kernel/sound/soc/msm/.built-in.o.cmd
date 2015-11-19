@@ -1,0 +1,1 @@
+cmd_sound/soc/msm/built-in.o :=  arm-eabi-ld -EL    -r -o sound/soc/msm/built-in.o sound/soc/msm/qdsp6/built-in.o sound/soc/msm/msm-dai-q6-hdmi.o sound/soc/msm/msm-pcm-voice.o sound/soc/msm/msm-pcm-voip.o sound/soc/msm/snd-soc-qdsp6.o sound/soc/msm/snd-soc-msm8960.o sound/soc/msm/snd-soc-hostless-pcm.o sound/soc/msm/asustek_headset.o 

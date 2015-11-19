@@ -1,0 +1,1 @@
+cmd_arch/arm/mach-msm/qdsp6v2/ultrasound/built-in.o :=  arm-eabi-ld -EL    -r -o arch/arm/mach-msm/qdsp6v2/ultrasound/built-in.o arch/arm/mach-msm/qdsp6v2/ultrasound/q6usm.o arch/arm/mach-msm/qdsp6v2/ultrasound/usf.o arch/arm/mach-msm/qdsp6v2/ultrasound/usfcdev.o 

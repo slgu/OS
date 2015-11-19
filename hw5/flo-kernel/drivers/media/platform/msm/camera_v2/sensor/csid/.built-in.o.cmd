@@ -1,0 +1,1 @@
+cmd_drivers/media/platform/msm/camera_v2/sensor/csid/built-in.o :=  arm-eabi-ld -EL    -r -o drivers/media/platform/msm/camera_v2/sensor/csid/built-in.o drivers/media/platform/msm/camera_v2/sensor/csid/msm_csid.o 

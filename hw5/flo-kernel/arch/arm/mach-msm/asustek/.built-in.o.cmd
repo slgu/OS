@@ -1,0 +1,1 @@
+cmd_arch/arm/mach-msm/asustek/built-in.o :=  arm-eabi-ld -EL    -r -o arch/arm/mach-msm/asustek/built-in.o arch/arm/mach-msm/asustek/flo/built-in.o arch/arm/mach-msm/asustek/devices_asustek.o arch/arm/mach-msm/asustek/asustek-pcbid.o arch/arm/mach-msm/asustek/asustek-keypad.o 

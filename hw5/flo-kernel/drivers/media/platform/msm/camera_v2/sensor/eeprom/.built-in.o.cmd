@@ -1,0 +1,1 @@
+cmd_drivers/media/platform/msm/camera_v2/sensor/eeprom/built-in.o :=  rm -f drivers/media/platform/msm/camera_v2/sensor/eeprom/built-in.o; arm-eabi-ar rcsD drivers/media/platform/msm/camera_v2/sensor/eeprom/built-in.o
