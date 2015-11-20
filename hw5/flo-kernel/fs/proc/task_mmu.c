@@ -18,45 +18,51 @@
 #include "internal.h"
 /* MODIFY */
 #include "config.h"
-/* I don't know why if change into return value format NULL pointer, maybe this will trigger follow_memory? */
-void virtual_to_physical(unsigned long addr, struct vm_area_struct *vma, unsigned long * res)
+
+struct page * virtual_to_physical(unsigned long addr, struct vm_area_struct *vma, unsigned long * physical)
 {
+	struct mm_struct *mm = vma->vm_mm; 
+	/*
+	struct page *page;
+	if (mm == NULL)
+		return -1;
+	page = follow_page(vma, addr, 0);
+	if (page == NULL)
+		return -1;
+	return page->index * PAGE_SIZE;
+	*/
 	pgd_t *pgd;
 	pud_t *pud;
 	pmd_t *pmd;
-	//pte_t *ptep, pte;
-	struct mm_struct *mm = vma->vm_mm;
-	//spinlock_t *ptl;
+	pte_t *ptep, pte;
+	if (mm == NULL) {
+		*physical = -1;
+		return NULL;
+	}
 	pgd = pgd_offset(mm, addr);
 	if (pgd_none(*pgd) || pgd_bad(*pgd)) {
-		*res = 0;
-		return;
+		*physical = -1;
+		return NULL;
 	}
 	pud = pud_offset(pgd, addr);
 	if (pud_none(*pud) || pud_bad(*pud)) {
-		*res = 0;
-		return;
+		*physical = -1;
+		return NULL;
 	}
 	pmd = pmd_offset(pud, addr);
 	if (pmd_none(*pmd) || pmd_bad(*pmd)) {
-		*res = 0;
-		return;
+		*physical = -1;
+		return NULL;
 	}
-	*res = 123;
-	/*
-	ptep = pte_offset_map_lock(mm, pmd, addr, &ptl);
+	ptep = pte_offset_map(pmd, addr);
 	pte = *ptep;
 	if (!pte_present(pte)) {
-		pte_unmap_unlock(ptep, ptl);
-		return 0;
+		*physical = -1;
+		return NULL;
 	}
-	else {
-		pte_unmap_unlock(ptep, ptl);
-		return pte;
-	}
-	*/
+	*physical = __pfn_to_phys(pte_pfn(pte));
+	return pte_page(pte);
 }
-/* MODIFY done */
 void task_mem(struct seq_file *m, struct mm_struct *mm)
 {
 	unsigned long data, text, lib, swap;
@@ -310,9 +316,9 @@ show_map_vma(struct seq_file *m, struct vm_area_struct *vma, int is_pid)
 	unsigned long ino = 0;
 	unsigned long long pgoff = 0;
 	unsigned long start, end;
-	/* MODIFY */
 #ifdef MODIFY
 	unsigned long physical_start, physical_end;
+	unsigned long cnt, page_use_cnt;
 #endif
 	/* MODIFY done */
 	dev_t dev = 0;
@@ -349,13 +355,31 @@ show_map_vma(struct seq_file *m, struct vm_area_struct *vma, int is_pid)
 	 * special [heap] marker for the heap:
 	 */
 	/* MODIFY between inode and filename*/
-	/* no flag needed */
 	/* start */
 #ifdef MODIFY
+	physical_start = 123;
+	physical_end = 123;
 	virtual_to_physical(start, vma, &physical_start);
 	virtual_to_physical(end - PAGE_SIZE, vma, &physical_end);
-	//seq_printf(m, "%08lx-%08lx ", physical_start, physical_end);
-	seq_printf(m, "%lu-%lu ", physical_start, physical_end);
+	if (physical_end != -1)
+		physical_end += PAGE_SIZE;
+	seq_printf(m, "%08lx-%08lx ", physical_start, physical_end);
+
+	/* statistic */
+	for (cnt = start; cnt != end; cnt += PAGE_SIZE) {
+		struct page *page = virtual_to_physical(cnt, vma, &physical_start);
+		if (page == NULL) {
+			seq_printf(m, ".");
+			continue;
+		}
+		page_use_cnt = page_count(page);
+		if (page_use_cnt <= 0)
+			seq_printf(m, ".");
+		else if (page_use_cnt >= 10)
+			seq_printf(m, "x");
+		else
+			seq_printf(m, "%lu", page_use_cnt);
+	}
 #endif
 	/* MODIFY done */
 	if (file) {
