@@ -1,0 +1,34 @@
+/* generate file and dir */
+
+touch test1_file
+mkdir test1_dir
+cd test1_dir
+echo "hello world" > test2_file
+cd ...
+touch test3_file
+
+/* execution result */
+./file_loc hmwk6/test1_dir/:
+	latitude:40.7993520
+	longitude:-73.9601056
+	accuracy:32.2000008
+	age:0
+	map url:http://maps.google.com/?q=40.7993520,-73.9601056
+./file_loc hmwk6/test1_file:
+	latitude:40.7993831
+	longitude:-73.9601046
+	accuracy:30.2229996
+	age:1
+	map url:http://maps.google.com/?q=40.7993831,-73.9601046
+/file_loc hmwk6/test1_dir/test2_file:
+	latitude:40.7993589
+	longitude:-73.9601244
+	accuracy:25.3869991
+	age:0
+	map url:http://maps.google.com/?q=40.7993589,-73.9601244
+./file_loc hmwk6/test3_file:
+	latitude:40.7993570
+	longitude:-73.9601014
+	accuracy:20.0000000
+	age:1
+	map url:http://maps.google.com/?q=40.7993570,-73.9601014
