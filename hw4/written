@@ -1,0 +1,26 @@
+we test our schduler by the score for Geekbench
+
+under front weight 10 back weight 1:
+	single-core: 558
+	multi-core: 1839
+
+under front weight 5 back weight 1:
+	single-core: 535
+	multi-core: 1752
+
+under front weight 1 back weight 1:
+	single-core: 567
+	multi-core: 1947
+
+default scheduler:
+	single-core: 577
+	multi-core: 1774
+
+There is no qualitative difference, just some noisy change.
+
+Using the benchmark along with 378 system call we can see wrr_weight of differen cpu and find the weight is almost balanced.
+
+Apart from the Geekbench test, test by test3.c program (which is high cpu computation tasks, fork 40 children processes, doing some
+cpu computation, sleep, doing some computation and return). This test needs to set our scheduler class behind fair or other programs will get
+stucked and android will reboot (by get wrr info, we find in this test.3 program, wrr_weight is almost balanced too proving the corretness of our load
+balance (and we use trace_printk to see if the load balance is working too).
